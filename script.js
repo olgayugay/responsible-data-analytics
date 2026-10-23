@@ -1,1 +1,33 @@
-const form=document.querySelector('#registrationForm');const type=document.querySelector('#registrationType');const fields=document.querySelector('#teamFields');const teamName=document.querySelector('#teamName');const teamMembers=document.querySelector('#teamMembers');const status=document.querySelector('#status');function updateType(){const team=type.value==='Team';fields.hidden=!team;teamName.required=team;teamMembers.required=team;}type.addEventListener('change',updateType);updateType();form.addEventListener('submit',async e=>{e.preventDefault();const endpoint=(window.REGISTRATION_ENDPOINT||'').trim();if(!endpoint){status.textContent='Registration is not connected yet. Please contact the organiser.';status.className='error';return;}const btn=form.querySelector('button[type=submit]');btn.disabled=true;status.className='';status.textContent='Submitting…';try{const data=Object.fromEntries(new FormData(form).entries());data.consent='Yes';data.source='Website';data.clientTime=new Date().toISOString();const body=new URLSearchParams(data);/* Apps Script Web Apps often do not provide CORS response headers. A simple form POST with no-cors allows submission but cannot verify the server result. */await fetch(endpoint,{method:'POST',mode:'no-cors',body});status.textContent='Submission sent. Please check with the organisers if you need confirmation; the browser cannot verify Google Sheets receipt.';status.className='success';form.reset();updateType();}catch(err){status.textContent='Unable to send registration. Please retry or contact the organisers.';status.className='error';}finally{btn.disabled=false;}});
+const form = document.querySelector('#entry-form');
+const fileInput = document.querySelector('#file');
+const fileMessage = document.querySelector('#file-message');
+const counter = document.querySelector('#count');
+const idea = document.querySelector('#description');
+if (idea && counter) {
+  const update = () => { counter.textContent = `${idea.value.length} / 2000 characters`; };
+  idea.addEventListener('input', update); update();
+}
+if (fileInput) fileInput.addEventListener('change', () => {
+  const file = fileInput.files[0];
+  fileMessage.textContent = file && file.size > 3*1024*1024
+    ? 'The file is too large. Choose one under 3 MB.'
+    : 'Example: a PDF, PowerPoint, Word file, Excel file or image.';
+});
+if (form) form.addEventListener('submit', async (event) => {
+  event.preventDefault();
+  const error = document.querySelector('#entry-error');
+  const button = form.querySelector('button[type="submit"]');
+  if (fileInput.files[0]?.size > 3*1024*1024) {
+    error.textContent = 'Choose a file under 3 MB.'; return;
+  }
+  error.textContent = ''; button.disabled = true; button.textContent = 'Working…';
+  try {
+    const response = await fetch('/.netlify/functions/entry', { method:'POST', body: new FormData(form) });
+    const result = await response.json();
+    if (!response.ok) throw new Error(result.error || 'Unable to receive your entry. Try again.');
+    window.location.assign(`/result.html?ref=${encodeURIComponent(result.id)}`);
+  } catch (e) {
+    error.textContent = e.message || 'Please try again.';
+    button.disabled = false; button.textContent = 'Enter my idea →';
+  }
+});
